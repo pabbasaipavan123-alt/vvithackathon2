@@ -1,0 +1,132 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (Auth UID)
+    // Fields:
+    //   - uid: string (required, immutable)
+    //   - name: string (required)
+    //   - email: string (required, immutable)
+    //   - bloodType: string (required)
+    //   - tokens: number (required)
+    //   - referralCode: string (required, immutable)
+    //   - age: number
+    //   - weight: number
+    //   - ...
+    //
+    // Collection: requests
+    // Document ID: requestId
+    // Fields:
+    //   - requesterId: string (required, immutable)
+    //   - bloodType: string (required)
+    //   - units: number (required)
+    //   - hospitalName: string (required)
+    //   - status: string (required)
+    //   - urgency: string (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "pabbasaipavan123@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['donor', 'hospital'] &&
+             data.bloodType in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] &&
+             data.tokens is number && data.tokens >= 0;
+    }
+
+    function isValidRequest(data) {
+      return data.bloodType in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] &&
+             data.units is number && data.units > 0 && data.units <= 10 &&
+             data.hospitalName is string && data.hospitalName.size() > 0 &&
+             data.urgency in ['normal', 'critical'] &&
+             data.status in ['pending', 'fulfilled', 'cancelled'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated(); // Needed for matching and profile viewing
+      
+      allow create: if isOwner(userId) && 
+                      isValidUser(request.resource.data) &&
+                      (
+                        (request.resource.data.role == 'donor' && request.resource.data.tokens == 50) ||
+                        (request.resource.data.role == 'hospital' && request.resource.data.tokens == 0)
+                      ) &&
+                      request.resource.data.uid == userId;
+
+      allow update: if isAuthenticated() && 
+                      isValidUser(request.resource.data) &&
+                      (
+                        // Owner can update their own profile
+                        (isOwner(userId) && 
+                         (!('role' in request.resource.data) || request.resource.data.role == resource.data.role)) ||
+                        // Admin can update anything
+                        isAdmin() ||
+                        // Allow token updates
+                        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tokens', 'redeemedItems']))
+                      );
+    }
+
+    match /requests/{requestId} {
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated() && 
+                      isValidRequest(request.resource.data) &&
+                      request.resource.data.requesterId == request.auth.uid &&
+                      request.resource.data.status == 'pending';
+
+      allow update: if isAuthenticated() && 
+                      isValidRequest(request.resource.data) &&
+                      (request.resource.data.requesterId == request.auth.uid || isAdmin());
+      
+      allow delete: if isAdmin();
+    }
+
+    match /donations/{donationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin(); // Only admins/hospitals verify donations
+      allow update: if isAdmin();
+    }
+
+    match /test/{docId} {
+      allow read: if true;
+    }
+  }
+}

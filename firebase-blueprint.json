@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Donor and patient profile information",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "role": { "type": "string", "enum": ["donor", "hospital"] },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "enum": ["male", "female", "other"] },
+        "bloodType": { "type": "string", "enum": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] },
+        "weight": { "type": "number" },
+        "phone": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "address": { "type": "string" }
+          }
+        },
+        "tokens": { "type": "number", "description": "Reward tokens balance" },
+        "referralCode": { "type": "string" },
+        "referredBy": { "type": "string", "description": "UID of the user who referred this user" },
+        "lastDonationDate": { "type": "string", "format": "date-time" },
+        "isDonor": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "redeemedItems": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of store item IDs redeemed by the user"
+        },
+        "licenseCode": { "type": "string" },
+        "consumedAlcoholRecently": { "type": "boolean" },
+        "hasChronicDiseases": { "type": "boolean" }
+      },
+      "required": ["uid", "name", "email", "bloodType", "tokens"]
+    },
+    "BloodRequest": {
+      "title": "Blood Request",
+      "description": "Urgent blood request from a patient or hospital",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "requesterId": { "type": "string" },
+        "bloodType": { "type": "string" },
+        "units": { "type": "number" },
+        "hospitalName": { "type": "string" },
+        "location": {
+          "type": "object",
+          "properties": {
+            "lat": { "type": "number" },
+            "lng": { "type": "number" },
+            "address": { "type": "string" }
+          }
+        },
+        "urgency": { "type": "string", "enum": ["normal", "critical"] },
+        "status": { "type": "string", "enum": ["pending", "fulfilled", "cancelled"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["requesterId", "bloodType", "units", "hospitalName", "urgency", "status"]
+    },
+    "Donation": {
+      "title": "Donation Record",
+      "description": "Record of a successful blood donation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "donorId": { "type": "string" },
+        "requestId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "tokensEarned": { "type": "number" },
+        "verified": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["donorId", "date", "verified"]
+    }
+  },
+  "firestore": {
+    "users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "requests/{requestId}": {
+      "schema": "BloodRequest",
+      "description": "Blood requests"
+    },
+    "donations/{donationId}": {
+      "schema": "Donation",
+      "description": "Donation records"
+    }
+  }
+}
